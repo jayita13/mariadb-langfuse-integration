@@ -1,0 +1,18 @@
+./venv
+venv/
+__pycache__
+*.pyc
+.env
+.env.local
+.env.*.local
+.DS_Store
+.idea
+.vscode
+*.sqlite3
+
+# Ignore database files
+*.db
+*.sql
+*.sqlite
+# Ignore logs
+*.log

@@ -1,0 +1,8 @@
+langchain-mariadb
+mariadb
+langfuse
+sentence-transformers
+langchain-community
+python-dotenv
+
+# !docker run --name mariadb-container -e MARIADB_ROOT_PASSWORD=langchain -e MARIADB_DATABASE=langchain -p 3306:3306 -d mariadb:11.7
