@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MariaDB and Langfuse Integration Blog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <header class="bg-blue-600 text-white py-6">
+    <div class="container mx-auto px-4">
+      <h1 class="text-3xl font-bold">MariaDB and Langfuse Integration</h1>
+      <p class="mt-2 text-lg">A guide to integrating Langfuse tracing with MariaDB vector store using LangChain</p>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-4 py-8">
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Overview</h2>
+      <p class="text-gray-700">
+        This blog describes a Python script (<code>main.py</code>) that integrates Langfuse for tracing with a MariaDB vector store using LangChain and Sentence Transformers. The script demonstrates how to:
+      </p>
+      <ul class="list-disc list-inside mt-2 text-gray-700">
+        <li>Initialize a Sentence Transformer model for embeddings.</li>
+        <li>Set up Langfuse for tracing application logic.</li>
+        <li>Configure a MariaDB vector store.</li>
+        <li>Add documents to the vector store and perform a similarity search.</li>
+        <li>Log results to Langfuse for observability.</li>
+      </ul>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Prerequisites</h2>
+      <p class="text-gray-700">To run the script, ensure the following are installed and configured:</p>
+      <ul class="list-disc list-inside mt-2 text-gray-700">
+        <li><strong>Python 3.8+</strong></li>
+        <li><strong>Dependencies</strong>: <code>langfuse</code>, <code>langchain-mariadb</code>, <code>langchain-community</code>, <code>sentence-transformers</code>, <code>python-dotenv</code></li>
+        <li><strong>MariaDB</strong>: A running MariaDB instance with a database named <code>langchain</code>.</li>
+        <li><strong>Environment Variables</strong>: Create a <code>.env</code> file with:
+          <pre class="bg-gray-100 p-4 rounded mt-2">
+LANGFUSE_PUBLIC_KEY=&lt;your-langfuse-public-key&gt;
+LANGFUSE_SECRET_KEY=&lt;your-langfuse-secret-key&gt;
+MARIADB_USER=&lt;your-mariadb-username&gt;
+MARIADB_PASSWORD=&lt;your-mariadb-password&gt;
+          </pre>
+        </li>
+        <li><strong>Langfuse Account</strong>: Sign up at <a href="https://cloud.langfuse.com" class="text-blue-600 hover:underline">Langfuse</a> to obtain <code>LANGFUSE_PUBLIC_KEY</code> and <code>LANGFUSE_SECRET_KEY</code>.</li>
+      </ul>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Installation</h2>
+      <ol class="list-decimal list-inside mt-2 text-gray-700">
+        <li>Clone the repository or copy the script to your local environment.</li>
+        <li>Install the required Python packages:
+          <pre class="bg-gray-100 p-4 rounded mt-2">
+pip install langfuse langchain-mariadb langchain-community sentence-transformers python-dotenv
+          </pre>
+        </li>
+        <li>Set up the <code>.env</code> file with your credentials.</li>
+        <li>Ensure MariaDB is running and accessible at <code>localhost</code> with the database <code>langchain</code> created.</li>
+      </ol>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Code Structure</h2>
+      <p class="text-gray-700">The script (<code>main.py</code>) is structured as follows:</p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">1. Importing Dependencies</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+import os
+from langfuse import get_client
+from langchain_mariadb import MariaDBStore
+from sentence_transformers import SentenceTransformer
+from langchain_core.documents import Document
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from dotenv import load_dotenv
+      </pre>
+      <p class="text-gray-700 mt-2">
+        - <code>os</code> and <code>dotenv</code>: Load environment variables.<br>
+        - <code>langfuse</code>: Provides the Langfuse SDK for tracing.<br>
+        - <code>langchain_mariadb</code>: MariaDB vector store integration with LangChain.<br>
+        - <code>sentence_transformers</code> and <code>langchain_community</code>: Generate embeddings using the <code>all-MiniLM-L6-v2</code> model.<br>
+        - <code>langchain_core.documents</code>: Defines the <code>Document</code> class for text storage.
+      </p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">2. Loading Environment Variables</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+load_dotenv()
+      </pre>
+      <p class="text-gray-700 mt-2">Loads environment variables from the <code>.env</code> file for secure access to credentials.</p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">3. Initializing the Sentence Transformer Model</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+      </pre>
+      <p class="text-gray-700 mt-2">
+        Uses the <code>all-MiniLM-L6-v2</code> model to generate 384-dimensional embeddings for text documents. The model is lightweight and optimized for semantic text similarity.
+      </p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">4. Setting Up Langfuse</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+os.environ["LANGFUSE_PUBLIC_KEY"] = os.getenv("LANGFUSE_PUBLIC_KEY")
+os.environ["LANGFUSE_SECRET_KEY"] = os.getenv("LANGFUSE_SECRET_KEY")
+os.environ["LANGFUSE_HOST"] = "https://cloud.langfuse.com"
+langfuse = get_client()
+if langfuse.auth_check():
+    print("Langfuse client is authenticated and ready!")
+else:
+    print("Authentication failed. Check your credentials.")
+      </pre>
+      <p class="text-gray-700 mt-2">
+        Configures Langfuse with public and secret keys from environment variables. Sets the Langfuse host to the cloud instance and verifies authentication.
+      </p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">5. Configuring the MariaDB Vector Store</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+url = f"mariadb+mariadbconnector://{os.getenv('MARIADB_USER')}:{os.getenv('MARIADB_PASSWORD')}@localhost/langchain"
+vectorstore = MariaDBStore(
+    embeddings=model,
+    embedding_length=384,
+    datasource=url,
+    collection_name="my_docs",
+)
+      </pre>
+      <p class="text-gray-700 mt-2">
+        Constructs a MariaDB connection string using environment variables. Initializes a <code>MariaDBStore</code> instance with the Sentence Transformer model, embedding length of 384, connection to the <code>langchain</code> database, and a collection named <code>my_docs</code>.
+      </p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">6. Application Logic with Langfuse Tracing</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+with langfuse.start_as_current_span(name="mariadb-trace") as span:
+    vectorstore.add_documents(
+        [
+            Document(page_content="The sun is a star."),
+            Document(page_content="The moon is a natural satellite.")
+        ]
+    )
+    results = vectorstore.similarity_search("Tell me about celestial bodies.")
+    span.update_trace(
+        metadata={"query": "Tell me about celestial bodies."}
+    )
+    print(f"Search results: {results}")
+      </pre>
+      <p class="text-gray-700 mt-2">
+        Starts a Langfuse trace named <code>mariadb-trace</code>, adds two sample documents to the vector store, performs a similarity search, logs the query metadata, and prints the results.
+      </p>
+
+      <h3 class="text-xl font-semibold mt-4 mb-2">7. Flushing Langfuse Data</h3>
+      <pre class="bg-gray-100 p-4 rounded text-sm">
+langfuse.flush()
+      </pre>
+      <p class="text-gray-700 mt-2">Ensures all trace data is sent to the Langfuse server.</p>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Usage</h2>
+      <ol class="list-decimal list-inside mt-2 text-gray-700">
+        <li>Ensure MariaDB is running and the <code>langchain</code> database exists.</li>
+        <li>Populate the <code>.env</code> file with your Langfuse and MariaDB credentials.</li>
+        <li>Run the script:
+          <pre class="bg-gray-100 p-4 rounded mt-2">
+python main.py
+          </pre>
+        </li>
+        <li>Expected output:
+          <ul class="list-disc list-inside mt-2">
+            <li>Confirmation of Langfuse authentication.</li>
+            <li>Search results from the MariaDB vector store, e.g.:
+              <pre class="bg-gray-100 p-4 rounded mt-2">
+Langfuse client is authenticated and ready!
+Search results: [Document(page_content='The sun is a star.'), Document(page_content='The moon is a natural satellite.')]
+              </pre>
+            </li>
+          </ul>
+        </li>
+        <li>Check the Langfuse dashboard (<a href="https://cloud.langfuse.com" class="text-blue-600 hover:underline">https://cloud.langfuse.com</a>) for trace details under the <code>mariadb-trace</code> span.</li>
+      </ol>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Notes</h2>
+      <ul class="list-disc list-inside mt-2 text-gray-700">
+        <li><strong>Embedding Model</strong>: The <code>all-MiniLM-L6-v2</code> model is used for its balance of performance and efficiency. Other models can be used by changing the <code>model_name</code> parameter, but ensure the <code>embedding_length</code> matches.</li>
+        <li><strong>MariaDB</strong>: Ensure the database user has appropriate permissions to create and modify tables in the <code>langchain</code> database.</li>
+        <li><strong>Langfuse</strong>: Traces are logged to the Langfuse cloud instance. Ensure your credentials are valid to avoid authentication errors.</li>
+        <li><strong>Error Handling</strong>: The script includes basic authentication checks for Langfuse. Additional error handling (e.g., for MariaDB connection failures) can be added as needed.</li>
+      </ul>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Troubleshooting</h2>
+      <ul class="list-disc list-inside mt-2 text-gray-700">
+        <li><strong>Langfuse Authentication Failure</strong>:
+          <ul class="list-disc list-inside ml-4">
+            <li>Verify <code>LANGFUSE_PUBLIC_KEY</code> and <code>LANGFUSE_SECRET_KEY</code> in the <code>.env</code> file.</li>
+            <li>Ensure the Langfuse host URL is correct.</li>
+          </ul>
+        </li>
+        <li><strong>MariaDB Connection Issues</strong>:
+          <ul class="list-disc list-inside ml-4">
+            <li>Check that MariaDB is running and accessible at <code>localhost</code>.</li>
+            <li>Confirm the <code>MARIADB_USER</code> and <code>MARIADB_PASSWORD</code> are correct.</li>
+            <li>Ensure the <code>langchain</code> database exists.</li>
+          </ul>
+        </li>
+        <li><strong>No Search Results</strong>:
+          <ul class="list-disc list-inside ml-4">
+            <li>Verify that documents were added successfully to the vector store.</li>
+            <li>Ensure the query is relevant to the stored documents.</li>
+          </ul>
+        </li>
+      </ul>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Future Improvements</h2>
+      <ul class="list-disc list-inside mt-2 text-gray-700">
+        <li>Add error handling for MariaDB connections and query failures.</li>
+        <li>Support dynamic document ingestion from external sources.</li>
+        <li>Enhance Langfuse tracing with additional metadata (e.g., search latency, result count).</li>
+        <li>Allow configuration of the Sentence Transformer model via command-line arguments.</li>
+      </ul>
+    </section>
+
+    <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-2xl font-semibold mb-4">License</h2>
+      <p class="text-gray-700">
+        This script is provided under the MIT License. See the repository's <a href="LICENSE" class="text-blue-600 hover:underline">LICENSE</a> file for details.
+      </p>
+    </section>
+  </main>
+
+  <footer class="bg-gray-800 text-white py-4">
+    <div class="container mx-auto px-4 text-center">
+      <p>&copy; 2025 jayita13. Powered by <a href="https://github.com" class="text-blue-400 hover:underline">GitHub</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>
