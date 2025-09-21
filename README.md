@@ -8,6 +8,9 @@ This document describes a Python script (`main.py`) that integrates Langfuse for
 - Add documents to the vector store and perform a similarity search.
 - Log results to Langfuse for observability.
 
+## Architecture Flow
+<img width="1681" height="754" alt="image" src="https://github.com/user-attachments/assets/8872eabc-b44b-4870-b1fd-198969e1e1dc" />
+
 ## Prerequisites
 To run the script, ensure the following are installed and configured:
 - **Python 3.8+**
